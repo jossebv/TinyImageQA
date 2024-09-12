@@ -160,3 +160,6 @@ images/
 
 # Ignore WandB
 wandb/
+
+# Checkpoints folder
+TinyImageQA/

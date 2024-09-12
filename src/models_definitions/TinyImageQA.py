@@ -131,6 +131,57 @@ class TinyImageQA(L.LightningModule):
         )
         return output.logits, output.loss
 
+    def generate_response(self, image, prompt_ids, prompt_att_masks, decoder_input_ids):
+        self.vit.eval()
+        self.embedding_layer.eval()
+        self.llm.eval()
+
+        # When combining, the token of newline has the id:2490
+        blank_token_position = (
+            (prompt_ids[0] == 2490).nonzero(as_tuple=True)[0][1].item()
+        )
+
+        image_features = self.vit(image).last_hidden_state
+        image_projection = self.projection(image_features)
+        text_embedding = self.embedding_layer(prompt_ids)
+
+        combined_input, attention_mask = self._combine_features(
+            text_embedding=text_embedding,
+            image_projection=image_projection,
+            prompt_att_masks=prompt_att_masks,
+            blank_token_pos=blank_token_position,
+        )
+
+        outputs = self.llm(
+            inputs_embeds=combined_input,
+            attention_mask=attention_mask,
+            decoder_input_ids=decoder_input_ids,
+            return_dict=True,
+        )
+
+        encoded_sequence = (outputs.encoder_last_hidden_state,)
+        lm_logits = outputs.logits
+
+        # sample last token with highest prob
+        next_decoder_input_ids = torch.argmax(lm_logits[:, -1:], axis=-1)
+        decoder_input_ids = torch.cat(
+            [decoder_input_ids, next_decoder_input_ids], axis=-1
+        )
+
+        for _ in range(50):
+            lm_logits = self.llm(
+                None,
+                encoder_outputs=encoded_sequence,
+                decoder_input_ids=decoder_input_ids,
+                return_dict=True,
+            ).logits
+            next_decoder_input_ids = torch.argmax(lm_logits[:, -1:], axis=-1)
+            decoder_input_ids = torch.cat(
+                [decoder_input_ids, next_decoder_input_ids], axis=-1
+            )
+
+        return decoder_input_ids
+
     def training_step(self, batch, batch_idx):
         image, prompt_ids, prompt_att_masks, target_ids = batch
         logits, loss = self(image, prompt_ids, prompt_att_masks, target_ids)
@@ -158,6 +209,7 @@ if __name__ == "__main__":
 
     train_dataloader = RLAIFDataModule(batch_size=4).train_dataloader()
     batch = next(iter(train_dataloader))
+    print([ts.size() for ts in batch])
 
     output_logits, loss = model(*batch)
     print(loss)

@@ -74,7 +74,7 @@ class RLAIFDataset(Dataset):
         )
         self.tokenizer = AutoTokenizer.from_pretrained("google/flan-t5-base")
 
-        # dataset = dataset.select(range(100))
+        # dataset = dataset.select(range(100))  # For testing
         dataset = dataset.map(
             self._preprocess_fn,
             # input_columns=["image", "question", "chosen"],

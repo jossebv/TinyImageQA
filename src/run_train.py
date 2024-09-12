@@ -8,9 +8,9 @@ from lightning.pytorch.loggers import WandbLogger
 def main(hparams):
     L.seed_everything(42, workers=True)
 
-    datamodule = RLAIFDataModule(batch_size=2, num_workers=7)
+    datamodule = RLAIFDataModule(batch_size=4, num_workers=7)
 
-    model = TinyImageQA(lora_r=8, lora_alpha=16)
+    model = TinyImageQA(lora_r=8, lora_alpha=16, lr=1e-5)
 
     logger = WandbLogger(
         project="TinyImageQA", entity="josebravopacheco-team", group=hparams.group
@@ -24,7 +24,7 @@ def main(hparams):
 
 if __name__ == "__main__":
     parser = ArgumentParser()
-    parser.add_argument("--group", default="Unnamed run")
+    parser.add_argument("--group", default="Ungrouped run")
 
     args = parser.parse_args()
     main(args)
